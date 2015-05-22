@@ -1,27 +1,38 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Data.Entity;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using System.Net;
-using System.Web;
 using System.Web.Mvc;
 using Microsoft.AspNet.Identity;
 using QueHeVisto.Presentacion.Web.Models;
+using QueHeVisto.Presentacion.Web.Models.Repositorios;
 
 namespace QueHeVisto.Presentacion.Web.Controllers
 {
     [Authorize]
     public class SeriesController : Controller
     {
-        private ApplicationDbContext db = new ApplicationDbContext();
+        private string ApplicationUserId {
+            get
+            {
+                return User.Identity.GetUserId();
+            }
+        }
+
+        private readonly IRepositorioSerie _repositorioSerie;
+
+        public SeriesController()
+        {
+            _repositorioSerie = new RepositorioSerie();
+        }
+
+        public SeriesController(IRepositorioSerie repositorioSerie)
+        {
+            _repositorioSerie = repositorioSerie;
+        }
 
         // GET: Series
         public async Task<ActionResult> Index()
         {
-            var serie = db.Serie;
-            return View(await serie.ToListAsync());
+            return View(await _repositorioSerie.ObtenerTodasMisSeries(ApplicationUserId));
         }
 
         // GET: Series/Details/5
@@ -31,7 +42,7 @@ namespace QueHeVisto.Presentacion.Web.Controllers
             {
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
-            Serie serie = await db.Serie.FindAsync(id);
+            Serie serie = await _repositorioSerie.ObtenerSeriePorId(ApplicationUserId, id.Value);
             if (serie == null)
             {
                 return HttpNotFound();
@@ -50,13 +61,11 @@ namespace QueHeVisto.Presentacion.Web.Controllers
         // más información vea http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Create([Bind(Include = "SerieId,Nombre,Genero,Vista,EnEmision")] Serie serie)
+        public async Task<ActionResult> Create([Bind(Include = "Nombre,Genero,Vista,EnEmision")] Serie serie)
         {
             if (ModelState.IsValid)
             {
-                serie.ApplicationUserId = User.Identity.GetUserId();
-                db.Serie.Add(serie);
-                await db.SaveChangesAsync();
+                await _repositorioSerie.Guardar(ApplicationUserId, serie);
                 return RedirectToAction("Index");
             }
 
@@ -70,7 +79,9 @@ namespace QueHeVisto.Presentacion.Web.Controllers
             {
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
-            Serie serie = await db.Serie.FindAsync(id);
+            string userApplicationId = User.Identity.GetUserId();
+            Serie serie = await 
+                _repositorioSerie.ObtenerSeriePorId(userApplicationId, id.Value);
             if (serie == null)
             {
                 return HttpNotFound();
@@ -84,13 +95,19 @@ namespace QueHeVisto.Presentacion.Web.Controllers
         // más información vea http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Edit([Bind(Include = "SerieId,Nombre,Genero,Vista,EnEmision,ApplicationUserId")] Serie serie)
+        public async Task<ActionResult> Edit([Bind(Include = "SerieId,Nombre,Genero,Vista,EnEmision")] Serie serie)
         {
             if (ModelState.IsValid)
             {
-                db.Entry(serie).State = EntityState.Modified;
-                await db.SaveChangesAsync();
-                return RedirectToAction("Index");
+                try
+                {
+                    await _repositorioSerie.Modificar(ApplicationUserId, serie);
+                    return RedirectToAction("Index");
+                }
+                catch (ElUsuarioNoPuedeRealizarLaOperacionExcepcion ex)
+                {
+                    return HttpNotFound();
+                }
             }
 
             return View(serie);
@@ -103,7 +120,7 @@ namespace QueHeVisto.Presentacion.Web.Controllers
             {
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
-            Serie serie = await db.Serie.FindAsync(id);
+            Serie serie = await _repositorioSerie.ObtenerSeriePorId(ApplicationUserId, id.Value);
             if (serie == null)
             {
                 return HttpNotFound();
@@ -116,19 +133,16 @@ namespace QueHeVisto.Presentacion.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> DeleteConfirmed(int id)
         {
-            Serie serie = await db.Serie.FindAsync(id);
-            db.Serie.Remove(serie);
-            await db.SaveChangesAsync();
-            return RedirectToAction("Index");
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
+            try
             {
-                db.Dispose();
+                await _repositorioSerie.Borrar(ApplicationUserId, id);
             }
-            base.Dispose(disposing);
+            catch (ElUsuarioNoPuedeRealizarLaOperacionExcepcion ex)
+            {
+                return HttpNotFound();
+            }
+
+            return RedirectToAction("Index");
         }
     }
 }

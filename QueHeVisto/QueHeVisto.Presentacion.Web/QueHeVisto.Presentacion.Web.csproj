@@ -184,6 +184,7 @@
     <Compile Include="Models\Capitulo.cs" />
     <Compile Include="Models\IdentityModels.cs" />
     <Compile Include="Models\ManageViewModels.cs" />
+    <Compile Include="Models\Repositorios\ElUsuarioNoPuedeRealizarLaOperacionExcepcion.cs" />
     <Compile Include="Models\Repositorios\IRepositorioSerie.cs" />
     <Compile Include="Models\Repositorios\RepositorioSerie.cs" />
     <Compile Include="Models\Serie.cs" />
